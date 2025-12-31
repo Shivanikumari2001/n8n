@@ -1,11 +1,86 @@
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: n8n
+# spec:
+#   replicas: 1
+
+#   # 🟢 IMPORTANT: Stateful app + single PVC
+#   # RollingUpdate se PVC conflict hota hai
+#   strategy:
+#     type: Recreate
+
+#   selector:
+#     matchLabels:
+#       app: n8n
+
+#   template:
+#     metadata:
+#       labels:
+#         app: n8n
+#     spec:
+#       # 🔐 FIX: PVC permission issue (EACCES)
+#       securityContext:
+#         fsGroup: 1000
+
+#       containers:
+#         - name: n8n
+#           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+#           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+#           ports:
+#             - containerPort: 5678
+
+#           env:
+#             - name: N8N_HOST
+#               value: "{{ .Values.ingress.host }}"
+#             - name: N8N_PORT
+#               value: "5678"
+
+#             # ⚠️ Pod HTTP pe chalta hai, HTTPS Ingress handle karta hai
+#             - name: N8N_PROTOCOL
+#               value: "http"
+
+#             - name: NODE_ENV
+#               value: "production"
+
+#             - name: N8N_EDITOR_BASE_URL
+#               value: "https://{{ .Values.ingress.host }}"
+#             - name: WEBHOOK_URL
+#               value: "https://{{ .Values.ingress.host }}"
+
+#             - name: N8N_ENCRYPTION_KEY
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: n8n-secret
+#                   key: N8N_ENCRYPTION_KEY
+
+#           resources:
+#             requests:
+#               cpu: {{ .Values.resources.requests.cpu }}
+#               memory: {{ .Values.resources.requests.memory }}
+#             limits:
+#               cpu: {{ .Values.resources.limits.cpu }}
+#               memory: {{ .Values.resources.limits.memory }}
+
+#           volumeMounts:
+#             - name: n8n-data
+#               mountPath: /home/node/.n8n
+
+#       volumes:
+#         - name: n8n-data
+#           persistentVolumeClaim:
+#             claimName: n8n-pvc
+
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: n8n
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
 
-  # 🟢 IMPORTANT: Stateful app + single PVC
+  # 🟢 Stateful app + single PVC
   # RollingUpdate se PVC conflict hota hai
   strategy:
     type: Recreate
@@ -19,7 +94,7 @@ spec:
       labels:
         app: n8n
     spec:
-      # 🔐 FIX: PVC permission issue (EACCES)
+      # 🔐 PVC permission fix
       securityContext:
         fsGroup: 1000
 
@@ -29,26 +104,30 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
           ports:
-            - containerPort: 5678
+            - containerPort: {{ .Values.service.port }}
 
           env:
+            # 🔹 Basic n8n config
             - name: N8N_HOST
-              value: "{{ .Values.ingress.host }}"
+              value: "{{ .Values.env.N8N_HOST }}"
             - name: N8N_PORT
-              value: "5678"
-
-            # ⚠️ Pod HTTP pe chalta hai, HTTPS Ingress handle karta hai
+              value: "{{ .Values.env.N8N_PORT }}"
             - name: N8N_PROTOCOL
-              value: "http"
-
+              value: "{{ .Values.env.N8N_PROTOCOL }}"
             - name: NODE_ENV
-              value: "production"
+              value: "{{ .Values.env.NODE_ENV }}"
+            - name: GENERIC_TIMEZONE
+              value: "{{ .Values.env.GENERIC_TIMEZONE }}"
 
+            # 🔹 Public URLs (SAFE: only if ingress enabled)
+            {{- if and .Values.ingress .Values.ingress.enabled }}
             - name: N8N_EDITOR_BASE_URL
               value: "https://{{ .Values.ingress.host }}"
             - name: WEBHOOK_URL
               value: "https://{{ .Values.ingress.host }}"
+            {{- end }}
 
+            # 🔹 Encryption key (required)
             - name: N8N_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
