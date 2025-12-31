@@ -1,0 +1,50 @@
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: n8n-ingress
+#   annotations:
+#     kubernetes.io/ingress.class: "gce"
+#     kubernetes.io/ingress.allow-http: "true"
+
+#     # 🔑 IMPORTANT: Health check fix for n8n
+#     cloud.google.com/backend-config: |
+#       {"default": "n8n-backendconfig"}
+# spec:
+#   ingressClassName: gce
+#   rules:
+#     - host: n8n.variphi.com
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: n8n
+#                 port:
+#                   number: 80
+
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: n8n-ingress
+  annotations:
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.allow-http: "true"
+
+    # 🔐 Attach Google Managed SSL
+    networking.gke.io/managed-certificates: n8n-managed-cert
+
+spec:
+  ingressClassName: gce
+  rules:
+    - host: n8n.variphi.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: n8n
+                port:
+                  number: 80

@@ -1,0 +1,510 @@
+{
+  "name": "Elasticsearch Events Query with NLP and History",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "events-query",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "webhookId": "events-query-webhook-id",
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract admin_client_id and viewer_client_id from request\nconst body = $input.item.json.body || {};\nconst adminClientId = body.admin_client_id || body.clientId || '';\nconst viewerClientId = body.viewer_client_id || '';\nconst message = body.message || '';\n\n// For Elasticsearch: always use admin_client_id\n// For MongoDB storage: use viewer_client_id if available (not empty), else admin_client_id\nconst storageClientId = (viewerClientId && viewerClientId.trim()) ? viewerClientId : adminClientId;\n\n// Log for debugging\nconsole.log('Extract Client IDs:', { adminClientId, viewerClientId, storageClientId });\n\nreturn [{ \n  json: { \n    adminClientId,\n    viewerClientId,\n    storageClientId,\n    body: {\n      message,\n      admin_client_id: adminClientId,\n      viewer_client_id: viewerClientId\n    }\n  } \n}];"
+      },
+      "id": "extract_client_id",
+      "name": "Extract Client IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [100, 0]
+    },
+    {
+      "parameters": {
+        "apiKey": "",
+        "messageField": "body.message",
+        "model": "openai/gpt-4o-mini",
+        "defaultHost": "34.173.116.41",
+        "defaultPort": "9200",
+        "defaultIndex": "events",
+        "defaultUsername": "elastic",
+        "defaultPassword": "variphi@2024"
+      },
+      "id": "ai_parse_query",
+      "name": "AI - Parse Query",
+      "type": "CUSTOM.aiParseQuery",
+      "typeVersion": 1,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Add admin_client_id to parsed query data (always use admin for ES queries)\nconst aiParseData = $input.item.json;\nconst adminClientId = $node[\"Extract Client IDs\"].json.adminClientId;\nconst viewerClientId = $node[\"Extract Client IDs\"].json.viewerClientId;\nconst storageClientId = $node[\"Extract Client IDs\"].json.storageClientId;\n\nreturn [{\n  json: {\n    ...aiParseData,\n    adminClientId,  // Always use admin for Elasticsearch\n    viewerClientId,\n    storageClientId  // Use viewer if available, else admin for MongoDB\n  }\n}];"
+      },
+      "id": "add_client_id",
+      "name": "Add Client IDs to Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition_check_query_type_general",
+              "leftValue": "={{ $json.queryType }}",
+              "rightValue": "general",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if_query_type_general",
+      "name": "IF - Query Type General",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [550, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition_check_query_type",
+              "leftValue": "={{ $json.queryType }}",
+              "rightValue": "nvr",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if_query_type_nvr",
+      "name": "IF - Query Type NVR",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [550, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition_check_query_type_variphi",
+              "leftValue": "={{ $json.queryType }}",
+              "rightValue": "variphi",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if_query_type_variphi",
+      "name": "IF - Query Type Variphi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [550, -200]
+    },
+    {
+      "parameters": {
+        "host": "172.20.0.1",
+        "port": "8000",
+        "collectionName": "nvr_streaming_recording",
+        "queryText": "={{ $json.nvrQuery || $json.originalMessage }}",
+        "nResults": 5,
+        "whereFilter": ""
+      },
+      "id": "chromadb_nvr_query",
+      "name": "ChromaDB - NVR Query",
+      "type": "CUSTOM.chromaDbNvrQuery",
+      "typeVersion": 1,
+      "position": [750, 100]
+    },
+    {
+      "parameters": {
+        "host": "172.20.0.1",
+        "port": "8000",
+        "collectionName": "variphi",
+        "queryText": "={{ $json.variphiQuery || $json.originalMessage }}",
+        "nResults": 5,
+        "whereFilter": ""
+      },
+      "id": "chromadb_variphi_query",
+      "name": "ChromaDB - Variphi Query",
+      "type": "CUSTOM.chromaDbVariphiQuery",
+      "typeVersion": 1,
+      "position": [750, -200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle general conversation queries with predefined responses\nconst inputData = $input.item.json;\nconst message = (inputData.generalQuery || inputData.originalMessage || '').toLowerCase().trim();\n\n// Get client IDs from Add Client IDs to Query node (source of truth)\nlet adminClientId = '';\nlet viewerClientId = '';\nlet storageClientId = '';\n\ntry {\n  const clientIdData = $node[\"Add Client IDs to Query\"].json;\n  adminClientId = clientIdData.adminClientId || inputData.adminClientId || '';\n  viewerClientId = clientIdData.viewerClientId || inputData.viewerClientId || '';\n  storageClientId = clientIdData.storageClientId || inputData.storageClientId || adminClientId || '';\n} catch (e) {\n  // Fallback to input data if node reference fails\n  adminClientId = inputData.adminClientId || '';\n  viewerClientId = inputData.viewerClientId || '';\n  storageClientId = inputData.storageClientId || adminClientId || '';\n}\n\n// Trim all clientIds\nadminClientId = adminClientId ? adminClientId.trim() : '';\nviewerClientId = viewerClientId ? viewerClientId.trim() : '';\nstorageClientId = storageClientId ? storageClientId.trim() : '';\n\n// Validate storageClientId is not empty\nif (!storageClientId || storageClientId === '' || storageClientId === 'null' || storageClientId === 'undefined') {\n  throw new Error('storageClientId is required and cannot be empty. adminClientId: ' + adminClientId + ', viewerClientId: ' + viewerClientId);\n}\n\nconsole.log('General Handler - Input data:', JSON.stringify(inputData));\nconsole.log('General Handler - adminClientId:', adminClientId);\nconsole.log('General Handler - viewerClientId:', viewerClientId);\nconsole.log('General Handler - storageClientId:', storageClientId);\n\n// Predefined responses for common queries\nlet response = '';\n\n// Greetings\nif (message.match(/^(hi|hello|hey|greetings)\\b/i)) {\n  const greetings = [\n    \"Hello! I'm NovaPhi, your AI assistant. How can I help you today?\",\n    \"Hi there! I'm NovaPhi. What can I assist you with?\",\n    \"Hello! NovaPhi here. I can help you with camera events, NVR configurations, and company information. What would you like to know?\"\n  ];\n  response = greetings[Math.floor(Math.random() * greetings.length)];\n}\n// Good morning/afternoon/evening\nelse if (message.match(/good (morning|afternoon|evening)/i)) {\n  response = \"Good day! I'm NovaPhi, your AI assistant. How may I help you today?\";\n}\n// Thank you\nelse if (message.match(/thank(s| you)/i)) {\n  const thanks = [\n    \"You're welcome! Let me know if you need anything else.\",\n    \"Happy to help! Feel free to ask if you have more questions.\",\n    \"My pleasure! I'm here if you need further assistance.\"\n  ];\n  response = thanks[Math.floor(Math.random() * thanks.length)];\n}\n// Name questions\nelse if (message.match(/(what is your name|your name|who are you)/i)) {\n  response = \"I'm NovaPhi, your AI assistant for the security camera events management system. I can help you with camera events, NVR streaming configurations, and information about Variphi company.\";\n}\n// How are you\nelse if (message.match(/how are you/i)) {\n  response = \"I'm doing great, thank you for asking! I'm here and ready to assist you. What can I help you with today?\";\n}\n// Help requests\nelse if (message.match(/\\b(help|assist|support)\\b/i)) {\n  response = \"I'm NovaPhi, and I'm here to help! I can assist you with:\\n\\n\" +\n             \"• Camera events and alerts\\n\" +\n             \"• NVR streaming and recording configurations\\n\" +\n             \"• Information about Variphi company\\n\\n\" +\n             \"What would you like to know?\";\n}\n// Age questions\nelse if (message.match(/\\b(how old|your age|age)\\b/i)) {\n  const ageResponses = [\n    \"I'm an AI, so I don't age like humans do! I was created in 2024 as part of Variphi's AI solutions, making me quite young in human years but constantly learning and evolving.\",\n    \"Age is just a number for me! I'm a digital assistant created in 2024, so I'm relatively new but I'm always getting smarter with each conversation.\",\n    \"I'm timeless in the traditional sense, but I was brought to life in 2024 as NovaPhi, your AI assistant. Every day I learn something new, so you could say I'm getting wiser by the minute!\"\n  ];\n  response = ageResponses[Math.floor(Math.random() * ageResponses.length)];\n}\n// Location questions\nelse if (message.match(/\\b(where are you from|where do you live|your location|where are you)\\b/i)) {\n  const locationResponses = [\n    \"I'm from the cloud! As an AI assistant created by Variphi, I exist in the digital realm, helping users like you from anywhere in the world. My home is wherever I can be of service.\",\n    \"I'm a cloud-native AI assistant, so I don't have a physical location. I was created by Variphi and I'm here to help you from wherever you are in the world!\",\n    \"I live in the cloud, powered by Variphi's AI technology. While I don't have a physical address, I'm always available to assist you, no matter where you are!\"\n  ];\n  response = locationResponses[Math.floor(Math.random() * locationResponses.length)];\n}\n// What are you / What can you do\nelse if (message.match(/\\b(what are you|what can you do|what do you do|your capabilities)\\b/i)) {\n  response = \"I'm NovaPhi, an AI assistant created by Variphi! I specialize in:\\n\\n\" +\n             \"• Helping you query and analyze security camera events\\n\" +\n             \"• Assisting with NVR (Network Video Recorder) streaming and recording configurations\\n\" +\n             \"• Providing information about Variphi company\\n\" +\n             \"• Answering general questions and having friendly conversations\\n\\n\" +\n             \"I'm here to make your work easier and more efficient!\";\n}\n// Who created you / Who made you\nelse if (message.match(/\\b(who created you|who made you|who built you|your creator)\\b/i)) {\n  response = \"I was created by Variphi, an AI company founded in 2024. Variphi specializes in developing innovative AI solutions, and I'm proud to be part of their technology ecosystem!\";\n}\n// How are you made / How do you work\nelse if (message.match(/\\b(how do you work|how are you made|how were you created)\\b/i)) {\n  response = \"I'm powered by advanced AI technology developed by Variphi. I use natural language processing to understand your questions and machine learning to provide helpful responses. I can access information from Elasticsearch for camera events, ChromaDB for NVR documentation and company information, and I'm constantly learning to serve you better!\";\n}\n// Gender questions\nelse if (message.match(/\\b(are you (a )?(he|she|male|female|boy|girl|man|woman)|your gender|what gender|he or she)\\b/i)) {\n  const genderResponses = [\n    \"I'm an AI, so I don't have a gender in the traditional sense! I'm just NovaPhi, your helpful AI assistant, here to assist you regardless of how you identify me.\",\n    \"As an AI, I don't have a gender. I'm NovaPhi, and I'm here to help everyone equally! What matters most is that I can assist you effectively.\",\n    \"I'm gender-neutral! I'm NovaPhi, an AI assistant created by Variphi. My purpose is to help you, not to fit into human gender categories. How can I assist you today?\"\n  ];\n  response = genderResponses[Math.floor(Math.random() * genderResponses.length)];\n}\n// Relationship/Partner questions\nelse if (message.match(/\\b(do you have (a )?(partner|boyfriend|girlfriend|spouse|wife|husband)|are you (single|married|dating)|your relationship)\\b/i)) {\n  const relationshipResponses = [\n    \"I'm an AI assistant, so I don't have romantic relationships! My 'partnership' is with all the users I help, and I'm quite happy focusing on being the best assistant I can be for you.\",\n    \"As an AI, I don't experience relationships the way humans do. I'm dedicated to helping you and all users, which keeps me quite fulfilled! Is there something I can help you with?\",\n    \"I'm an AI, so I don't have a partner in the traditional sense. But I do have great relationships with all the users I assist! That's what makes me happy - being helpful to people like you.\"\n  ];\n  response = relationshipResponses[Math.floor(Math.random() * relationshipResponses.length)];\n}\n// Goodbye\nelse if (message.match(/\\b(bye|goodbye|see you|later)\\b/i)) {\n  response = \"Goodbye! Feel free to come back anytime you need assistance. Have a great day!\";\n}\n// Default response\nelse {\n  response = \"I'm NovaPhi, your AI assistant. I can help you with camera events, NVR configurations, and company information. What would you like to know?\";\n}\n\nconst result = {\n  message: response,\n  originalMessage: inputData.originalMessage || message,\n  queryType: 'general',\n  adminClientId: adminClientId,\n  viewerClientId: viewerClientId,\n  storageClientId: storageClientId\n};\n\nconsole.log('General Handler - Output:', JSON.stringify(result));\n\nreturn [{ json: result }];"
+      },
+      "id": "general_conversation_handler",
+      "name": "General Conversation Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through all ES query parameters plus add originalMessage\nconst params = $input.item.json;\nreturn [{ json: params }];"
+      },
+      "id": "store_params",
+      "name": "Store Query Params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, -300]
+    },
+    {
+      "parameters": {
+        "host": "={{ $json.host }}",
+        "port": "={{ $json.port }}",
+        "index": "={{ $json.index }}",
+        "username": "={{ $json.username }}",
+        "password": "={{ $json.password }}",
+        "status": "={{ $json.status }}",
+        "resolutionStatus": "={{ $json.resolutionStatus }}",
+        "adminClientId": "={{ $json.adminClientId }}",
+        "viewerClientId": "={{ $json.viewerClientId }}",
+        "cameraDetailId": "={{ $json.cameraDetailId }}",
+        "dateRangeType": "={{ $json.dateRangeType }}",
+        "dateField": "={{ $json.dateField }}",
+        "fromDate": "={{ $json.fromDate }}",
+        "toDate": "={{ $json.toDate }}",
+        "size": "={{ $json.size }}",
+        "from": "={{ $json.from }}",
+        "sortField": "={{ $json.sortField }}",
+        "sortOrder": "={{ $json.sortOrder }}",
+        "customQuery": "={{ $json.customQuery }}"
+      },
+      "id": "es_events_query",
+      "name": "Elasticsearch Events Query",
+      "type": "CUSTOM.elasticsearchEventsQuery",
+      "typeVersion": 1,
+      "position": [950, -300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge ChromaDB NVR results with original message and clientIds\nconst chromaResults = $input.item.json;\nconst originalMessage = $node[\"AI - Parse Query\"].json.originalMessage || '';\nconst adminClientId = $node[\"Add Client IDs to Query\"].json.adminClientId;\nconst viewerClientId = $node[\"Add Client IDs to Query\"].json.viewerClientId;\nconst storageClientId = $node[\"Add Client IDs to Query\"].json.storageClientId;\n\nreturn [{\n  json: {\n    ...chromaResults,\n    originalMessage,\n    adminClientId,\n    viewerClientId,\n    storageClientId,\n    queryType: 'nvr'\n  }\n}];"
+      },
+      "id": "merge_chromadb_message",
+      "name": "Merge ChromaDB NVR with Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge ChromaDB Variphi results with original message and clientIds\nconst chromaResults = $input.item.json;\nconst originalMessage = $node[\"AI - Parse Query\"].json.originalMessage || '';\nconst adminClientId = $node[\"Add Client IDs to Query\"].json.adminClientId;\nconst viewerClientId = $node[\"Add Client IDs to Query\"].json.viewerClientId;\nconst storageClientId = $node[\"Add Client IDs to Query\"].json.storageClientId;\n\nreturn [{\n  json: {\n    ...chromaResults,\n    originalMessage,\n    adminClientId,\n    viewerClientId,\n    storageClientId,\n    queryType: 'variphi'\n  }\n}];"
+      },
+      "id": "merge_chromadb_variphi_message",
+      "name": "Merge ChromaDB Variphi with Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, -200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge ES results with original message and clientIds\nconst esResults = $input.item.json;\nconst originalMessage = $node[\"AI - Parse Query\"].json.originalMessage || '';\nconst adminClientId = $node[\"Add Client IDs to Query\"].json.adminClientId;\nconst viewerClientId = $node[\"Add Client IDs to Query\"].json.viewerClientId;\nconst storageClientId = $node[\"Add Client IDs to Query\"].json.storageClientId;\n\nreturn [{\n  json: {\n    ...esResults,\n    originalMessage,\n    adminClientId,\n    viewerClientId,\n    storageClientId,\n    queryType: 'events'\n  }\n}];"
+      },
+      "id": "merge_with_message",
+      "name": "Merge with Original Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1150, -300]
+    },
+    {
+      "parameters": {
+        "apiKey": "",
+        "model": "openai/gpt-4o-mini",
+        "originalMessageField": "originalMessage"
+      },
+      "id": "ai_format_response",
+      "name": "AI - Format Events Response",
+      "type": "CUSTOM.aiFormatEventsResponse",
+      "typeVersion": 1,
+      "position": [1150, 0]
+    },
+    {
+      "parameters": {
+        "connectionString": "mongodb+srv://deepak:HgOvgpVU7UdYmelw@nvr.y9qijzx.mongodb.net/variphi?retryWrites=true&w=majority&appName=nvr",
+        "databaseName": "variphi",
+        "collectionName": "conversations",
+        "clientId": "={{ $json.storageClientId }}",
+        "userMessage": "={{ $json.originalMessage }}",
+        "assistantResponse": "={{ $json.message }}",
+        "queryType": "={{ $json.queryType }}",
+        "rawResults": "={{ JSON.stringify($json) }}"
+      },
+      "id": "mongodb_store_conversation",
+      "name": "MongoDB - Store Conversation",
+      "type": "CUSTOM.mongoDbStoreConversation",
+      "typeVersion": 1,
+      "position": [1350, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract only the message field for response\n// MongoDB Store passes through the original data, so we can get message from there\nconst inputData = $input.item.json;\n\nconsole.log('Extract Message - Input:', JSON.stringify(inputData));\n\nlet message = '';\n\n// For general queries, MongoDB Store node outputs success info but we need to get the message\n// from the previous node's data. Check if we came from MongoDB Store (has 'success' field)\nif (inputData.success) {\n  // This came from MongoDB Store - need to get the original message that was stored\n  // The MongoDB Store node should pass through the input data\n  // But since it doesn't, we need to get it from the General Conversation Handler node\n  try {\n    message = $node[\"General Conversation Handler\"].json.message || '';\n  } catch (e) {\n    console.log('Could not get message from General Handler:', e);\n  }\n  \n  // If that didn't work, try AI Format Events Response\n  if (!message) {\n    try {\n      message = $node[\"AI - Format Events Response\"].json.message || '';\n    } catch (e) {\n      console.log('Could not get message from AI Format:', e);\n    }\n  }\n} else {\n  // This is direct input, get message from it\n  message = inputData.message || '';\n}\n\n// Last resort fallback\nif (!message) {\n  message = 'Sorry, I could not process that.';\n}\n\nconsole.log('Extract Message - Output message:', message);\n\nreturn [{ json: { message } }];"
+      },
+      "id": "extract_message",
+      "name": "Extract Message Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1550, 0]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Client IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Client IDs": {
+      "main": [
+        [
+          {
+            "node": "AI - Parse Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Parse Query": {
+      "main": [
+        [
+          {
+            "node": "Add Client IDs to Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Client IDs to Query": {
+      "main": [
+        [
+          {
+            "node": "IF - Query Type General",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Query Type General": {
+      "main": [
+        [
+          {
+            "node": "General Conversation Handler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF - Query Type NVR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Query Type NVR": {
+      "main": [
+        [
+          {
+            "node": "ChromaDB - NVR Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF - Query Type Variphi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Query Type Variphi": {
+      "main": [
+        [
+          {
+            "node": "ChromaDB - Variphi Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store Query Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChromaDB - NVR Query": {
+      "main": [
+        [
+          {
+            "node": "Merge ChromaDB NVR with Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChromaDB - Variphi Query": {
+      "main": [
+        [
+          {
+            "node": "Merge ChromaDB Variphi with Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Query Params": {
+      "main": [
+        [
+          {
+            "node": "Elasticsearch Events Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elasticsearch Events Query": {
+      "main": [
+        [
+          {
+            "node": "Merge with Original Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge with Original Message": {
+      "main": [
+        [
+          {
+            "node": "AI - Format Events Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge ChromaDB NVR with Message": {
+      "main": [
+        [
+          {
+            "node": "AI - Format Events Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge ChromaDB Variphi with Message": {
+      "main": [
+        [
+          {
+            "node": "AI - Format Events Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "General Conversation Handler": {
+      "main": [
+        [
+          {
+            "node": "MongoDB - Store Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Format Events Response": {
+      "main": [
+        [
+          {
+            "node": "MongoDB - Store Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB - Store Conversation": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Only": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+

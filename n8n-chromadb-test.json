@@ -1,0 +1,78 @@
+{
+  "name": "ChromaDB Embedding Test",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chromadb-test",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "webhookId": "chromadb-test-webhook-id",
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "host": "172.20.0.1",
+        "port": "8000",
+        "collectionName": "nvr_streaming_recording",
+        "queryText": "={{ typeof $json.query === 'string' ? $json.query : (typeof $json.message === 'string' ? $json.message : 'RTSP streaming') }}",
+        "nResults": 5,
+        "whereFilter": ""
+      },
+      "id": "chromadb_query",
+      "name": "ChromaDB Query",
+      "type": "CUSTOM.chromaDbNvrQuery",
+      "typeVersion": 1,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for testing\nconst result = $input.item.json;\n\nreturn [{\n  json: {\n    success: true,\n    query: result.query,\n    totalResults: result.totalResults,\n    results: result.results.map(r => ({\n      id: r.id,\n      document: r.document.substring(0, 200) + (r.document.length > 200 ? '...' : ''),\n      distance: r.distance,\n      metadata: r.metadata\n    })),\n    rawResults: result.results\n  }\n}];"
+      },
+      "id": "format_response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 0]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "ChromaDB Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChromaDB Query": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+

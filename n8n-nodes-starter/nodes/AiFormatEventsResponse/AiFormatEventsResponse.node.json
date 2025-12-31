@@ -1,0 +1,15 @@
+{
+  "node": "CUSTOM.aiFormatEventsResponse",
+  "nodeVersion": "1.0",
+  "codex": {
+    "categories": ["AI"],
+    "resources": {
+      "primaryDocumentation": [
+        {
+          "url": "https://docs.n8n.io/integrations/creating-nodes/"
+        }
+      ]
+    }
+  }
+}
+

@@ -1,0 +1,33 @@
+{
+	"name": "aiFormatFinalResponse",
+	"displayName": "AI - Format Final Response",
+	"icon": "file:format.svg",
+	"group": ["transform"],
+	"version": 1,
+	"description": "Formats AI/Elasticsearch results into a final clean response",
+	"defaults": {
+		"name": "AI - Format Final Response"
+	},
+	"inputs": ["main"],
+	"outputs": ["main"],
+	"properties": [
+		{
+			"displayName": "Formatting Style",
+			"name": "style",
+			"type": "options",
+			"options": [
+				{ "name": "Markdown", "value": "markdown" },
+				{ "name": "Bullet Points", "value": "bullet" },
+				{ "name": "Plain Text", "value": "plain" },
+				{ "name": "Summary (1 Paragraph)", "value": "summary" }
+			],
+			"default": "markdown"
+		},
+		{
+			"displayName": "Field Containing Raw Data",
+			"name": "rawField",
+			"type": "string",
+			"default": "hits"
+		}
+	]
+}

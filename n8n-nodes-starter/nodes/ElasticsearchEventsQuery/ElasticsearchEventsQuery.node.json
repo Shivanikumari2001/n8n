@@ -1,0 +1,14 @@
+{
+	"name": "elasticsearchEventsQuery",
+	"displayName": "Elasticsearch Events Query",
+	"icon": "file:elasticsearch.svg",
+	"group": ["transform"],
+	"version": 1,
+	"description": "Query Elasticsearch events index with advanced filtering",
+	"defaults": {
+		"name": "Elasticsearch Events Query"
+	},
+	"inputs": ["main"],
+	"outputs": ["main"]
+}
+

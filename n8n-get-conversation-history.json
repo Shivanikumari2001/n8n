@@ -1,0 +1,98 @@
+{
+  "name": "Get Conversation History",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "conversation-history",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook_get_conversation",
+      "name": "Webhook - Get Conversation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "webhookId": "get-conversation-webhook-id",
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract clientId from query parameters or body\nconst clientId = $input.item.json.query?.clientId || $input.item.json.body?.clientId || '';\n\nif (!clientId) {\n  throw new Error('clientId parameter is required');\n}\n\nreturn [{ \n  json: { \n    clientId\n  } \n}];"
+      },
+      "id": "extract_client_id",
+      "name": "Extract Client ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "connectionString": "mongodb+srv://deepak:HgOvgpVU7UdYmelw@nvr.y9qijzx.mongodb.net/variphi?retryWrites=true&w=majority&appName=nvr",
+        "databaseName": "variphi",
+        "collectionName": "conversations",
+        "clientId": "={{ $json.clientId }}",
+        "includeRawResults": false
+      },
+      "id": "mongodb_get_conversation",
+      "name": "MongoDB - Get Conversation",
+      "type": "CUSTOM.mongoDbGetConversation",
+      "typeVersion": 1,
+      "position": [400, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the conversation for better readability\nconst data = $input.item.json;\n\nif (!data.found) {\n  return [{\n    json: {\n      success: true,\n      clientId: data.clientId,\n      message: 'No conversation history found for this client',\n      conversationId: null,\n      messageCount: 0,\n      messages: []\n    }\n  }];\n}\n\n// Format messages with cleaner structure\nconst formattedMessages = data.messages.map((msg, index) => ({\n  messageNumber: index + 1,\n  chatId: msg.chatId,\n  timestamp: msg.timestamp,\n  userMessage: msg.userMessage,\n  assistantResponse: msg.assistantResponse,\n  queryType: msg.queryType\n}));\n\nreturn [{\n  json: {\n    success: true,\n    clientId: data.clientId,\n    conversationId: data.conversationId,\n    messageCount: data.messageCount,\n    createdAt: data.createdAt,\n    updatedAt: data.updatedAt,\n    messages: formattedMessages\n  }\n}];"
+      },
+      "id": "format_response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 0]
+    }
+  ],
+  "connections": {
+    "Webhook - Get Conversation": {
+      "main": [
+        [
+          {
+            "node": "Extract Client ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Client ID": {
+      "main": [
+        [
+          {
+            "node": "MongoDB - Get Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB - Get Conversation": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+

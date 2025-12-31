@@ -1,0 +1,15 @@
+{
+  "node": "CUSTOM.chromaDbNvrQuery",
+  "nodeVersion": "1.0",
+  "codex": {
+    "categories": ["AI", "Database"],
+    "resources": {
+      "primaryDocumentation": [
+        {
+          "url": "https://docs.trychroma.com/"
+        }
+      ]
+    }
+  }
+}
+
