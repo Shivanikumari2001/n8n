@@ -6,58 +6,75 @@ on:
       - main
 
 env:
+  # 🔹 GCP
   PROJECT_ID: variphi
+
+  # 🔹 Artifact Registry
   GAR_LOCATION: asia-south1
   GAR_REPOSITORY: n8n
   IMAGE_NAME: n8n-custom
+
+  # 🔹 GKE (REGIONAL CLUSTER)
   GKE_CLUSTER: gke-prod-asia-south1
-  GKE_ZONE: asia-south1-a
+  GKE_REGION: asia-south1   # ✅ regional cluster → use region, NOT zone
+
+  # 🔹 Kubernetes
   NAMESPACE: n8n
 
 jobs:
   deploy:
+    name: Build & Deploy to GKE
     runs-on: ubuntu-latest
 
     steps:
+      # 📥 Checkout source
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 🔐 GCP Auth (SERVICE ACCOUNT JSON)
+      # 🔐 Authenticate to GCP using Service Account JSON
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # ☁️ Setup gcloud SDK
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      # 🐳 Configure Docker for Artifact Registry
       - name: Configure Docker authentication
         run: |
           gcloud auth configure-docker \
             ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
+      # 🏗️ Build & Push Docker Image
       - name: Build & Push n8n Docker Image
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+          echo "Building image: $IMAGE_URI"
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
+      # 🔑 Get GKE credentials (REGION FIX APPLIED)
       - name: Get GKE cluster credentials
         run: |
           gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
-            --zone ${{ env.GKE_ZONE }} \
+            --region ${{ env.GKE_REGION }} \
             --project ${{ env.PROJECT_ID }}
 
+      # ⛵ Install Helm
       - name: Install Helm
         uses: azure/setup-helm@v4
 
+      # 🔍 Helm lint
       - name: Helm lint
         run: helm lint helm/n8n
 
+      # 🚀 Deploy to GKE using Helm
       - name: Deploy n8n using Helm
         env:
           IMAGE_TAG: ${{ github.sha }}
