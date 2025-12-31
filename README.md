@@ -204,3 +204,4 @@ Then add it to your .env file.
 
 
 
+<!-- echo "# CI trigger $(date)" >> README.md -->
