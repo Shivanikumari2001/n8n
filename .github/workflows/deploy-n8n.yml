@@ -16,79 +16,48 @@ env:
 
 jobs:
   deploy:
-    name: Build Image & Deploy to GKE
     runs-on: ubuntu-latest
 
     steps:
-      # -----------------------------
-      # 1️⃣ Checkout code
-      # -----------------------------
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 2️⃣ Authenticate to GCP
-      # -----------------------------
+      # 🔐 GCP Auth (SERVICE ACCOUNT JSON)
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # -----------------------------
-      # 3️⃣ Setup gcloud
-      # -----------------------------
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      # -----------------------------
-      # 4️⃣ Configure Docker for Artifact Registry
-      # -----------------------------
       - name: Configure Docker authentication
         run: |
-          gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
+          gcloud auth configure-docker \
+            ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
-      # -----------------------------
-      # 5️⃣ Build & Push Docker Image
-      # -----------------------------
       - name: Build & Push n8n Docker Image
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE_URI=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG
-
-          echo "Building image: $IMAGE_URI"
+          IMAGE_URI=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
           docker build -t $IMAGE_URI .
-
-          echo "Pushing image to Artifact Registry"
           docker push $IMAGE_URI
 
-      # -----------------------------
-      # 6️⃣ Get GKE credentials
-      # -----------------------------
       - name: Get GKE cluster credentials
         run: |
           gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
             --zone ${{ env.GKE_ZONE }} \
             --project ${{ env.PROJECT_ID }}
 
-      # -----------------------------
-      # 7️⃣ Setup Helm
-      # -----------------------------
       - name: Install Helm
         uses: azure/setup-helm@v4
 
-      # -----------------------------
-      # 8️⃣ Helm lint (safety check)
-      # -----------------------------
       - name: Helm lint
-        run: |
-          helm lint helm/n8n
+        run: helm lint helm/n8n
 
-      # -----------------------------
-      # 9️⃣ Deploy to GKE using Helm
-      # -----------------------------
       - name: Deploy n8n using Helm
         env:
           IMAGE_TAG: ${{ github.sha }}
@@ -97,4 +66,4 @@ jobs:
             --namespace ${{ env.NAMESPACE }} \
             --create-namespace \
             --set image.repository=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }} \
-            --set image.tag=$IMAGE_TAG
+            --set image.tag=${IMAGE_TAG}
