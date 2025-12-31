@@ -16,7 +16,7 @@ env:
 
   # 🔹 GKE (REGIONAL CLUSTER)
   GKE_CLUSTER: gke-prod-asia-south1
-  GKE_REGION: asia-south1   # ✅ regional cluster → use region, NOT zone
+  GKE_REGION: asia-south1
 
   # 🔹 Kubernetes
   NAMESPACE: n8n
@@ -31,17 +31,23 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 🔐 Authenticate to GCP using Service Account JSON
+      # 🔐 Authenticate to GCP
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # ☁️ Setup gcloud SDK
+      # ☁️ Setup gcloud SDK + INSTALL GKE AUTH PLUGIN (IMPORTANT FIX)
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
+          install_components: gke-gcloud-auth-plugin
+
+      # ✅ Enable GKE auth plugin for kubectl
+      - name: Enable GKE auth plugin
+        run: |
+          echo "USE_GKE_GCLOUD_AUTH_PLUGIN=True" >> $GITHUB_ENV
 
       # 🐳 Configure Docker for Artifact Registry
       - name: Configure Docker authentication
@@ -59,7 +65,7 @@ jobs:
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
-      # 🔑 Get GKE credentials (REGION FIX APPLIED)
+      # 🔑 Get GKE cluster credentials (REGIONAL)
       - name: Get GKE cluster credentials
         run: |
           gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
@@ -74,7 +80,7 @@ jobs:
       - name: Helm lint
         run: helm lint helm/n8n
 
-      # 🚀 Deploy to GKE using Helm
+      # 🚀 Deploy n8n using Helm
       - name: Deploy n8n using Helm
         env:
           IMAGE_TAG: ${{ github.sha }}
