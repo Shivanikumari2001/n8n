@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-
+      - ci-cd
 env:
   # 🔹 GCP
   PROJECT_ID: variphi
