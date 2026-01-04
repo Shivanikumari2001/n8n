@@ -1,3 +1,61 @@
+# services:
+#   n8n-editor:
+#     build:
+#       context: .
+#       dockerfile: ./Dockerfile
+#     image: dac-n8n-custom:0.0.1
+#     container_name: dac-n8n-custom
+#     volumes:
+#       - n8n_data:/home/node/.n8n
+#     ports:
+#       - 5678:5678
+#     env_file:
+#       - .env
+#     environment:
+#       - N8N_SECURE_COOKIE=false
+#       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+#       - OPENAI_API_KEY=
+#       - OPENROUTER_API_KEY=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
+#       - TIMEZONE=${TIMEZONE:-Asia/Kolkata}
+#       # Email/SMTP Configuration for User Invitations
+#       - N8N_EMAIL_MODE=smtp
+#       - N8N_SMTP_HOST=smtpout.secureserver.net
+#       - N8N_SMTP_PORT=465
+#       - N8N_SMTP_USER=information@variphi.com
+#       - N8N_SMTP_PASS=Nextneural@2402
+#       - N8N_SMTP_SENDER=information@variphi.com
+#       - N8N_SMTP_FROM=information@variphi.com
+#       - N8N_SMTP_SECURE=true
+#     depends_on:
+#       - chromadb
+#     networks:
+#       - n8n-network
+
+#   chromadb:
+#     image: chromadb/chroma:latest
+#     container_name: chromadb-nvr
+#     ports:
+#       - 8000:8000
+#     volumes:
+#       - chroma_data:/chroma/chroma
+#     environment:
+#       - IS_PERSISTENT=TRUE
+#       - ANONYMIZED_TELEMETRY=FALSE
+#     networks:
+#       - n8n-network
+#     restart: unless-stopped
+
+# volumes:
+#   chroma_data:
+#     driver: local
+#   n8n_data:
+#     driver: local
+
+# networks:
+#   n8n-network:
+#     driver: bridge
+
+
 services:
   n8n-editor:
     build:
@@ -8,7 +66,7 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
     ports:
-      - 5678:5678
+      - 80:5678
     env_file:
       - .env
     environment:
@@ -17,6 +75,11 @@ services:
       - OPENAI_API_KEY=
       - OPENROUTER_API_KEY=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
       - TIMEZONE=${TIMEZONE:-Asia/Kolkata}
+      # Domain Configuration
+      - N8N_HOST=n8n.variphi.com
+      - N8N_PROTOCOL=http
+      - N8N_EDITOR_BASE_URL=http://n8n.variphi.com
+      - WEBHOOK_URL=http://n8n.variphi.com
       # Email/SMTP Configuration for User Invitations
       - N8N_EMAIL_MODE=smtp
       - N8N_SMTP_HOST=smtpout.secureserver.net

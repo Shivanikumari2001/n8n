@@ -1,68 +1,4 @@
-# replicaCount: 1
-
-# image:
-#   repository: n8nio/n8n
-#   tag: latest
-#   pullPolicy: IfNotPresent
-
-# service:
-#   port: 5678
-
-# resources:
-#   requests:
-#     cpu: "500m"
-#     memory: "1Gi"
-#   limits:
-#     cpu: "1"
-#     memory: "2Gi"
-
-# persistence:
-#   enabled: true
-#   size: 10Gi
-
-# ingress:
-#   enabled: true
-#   className: gce
-#   host: n8n.variphi.com
-
-# nodePool:
-#   name: gke-prod-asia-south1-np-app-prod
-
-# replicaCount: 1
-
-# image:
-#   repository: ""
-#   tag: "latest"
-#   pullPolicy: IfNotPresent
-
-# service:
-#   type: ClusterIP
-#   port: 5678
-
-# resources:
-#   requests:
-#     cpu: "250m"
-#     memory: "512Mi"
-#   limits:
-#     cpu: "500m"
-#     memory: "1Gi"
-
-# env:
-#   N8N_HOST: "0.0.0.0"
-#   N8N_PORT: "5678"
-#   N8N_PROTOCOL: "http"
-#   NODE_ENV: "production"
-#   GENERIC_TIMEZONE: "Asia/Kolkata"
-
-# persistence:
-#   enabled: true
-#   size: 10Gi
-#   accessModes:
-#     - ReadWriteOnce
-
-
-
-replicaCount: 1
+-replicaCount: 1
 
 image:
   repository: ""        # CI/CD isko --set se override karega
@@ -101,5 +37,3 @@ persistence:
   size: 10Gi
   accessModes:
     - ReadWriteOnce
-# ,m,mmnmhjgjhghhj
-#commit code
